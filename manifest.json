@@ -1,0 +1,82 @@
+{
+  "$schema": "https://unpkg.com/flare-plugin-sdk@next/skill/flare-plugin/manifest.schema.json",
+  "schemaVersion": 1,
+  "apiVersion": 1,
+  "id": "dev.flareplugins.tumblr",
+  "version": "0.1.0",
+  "name": "Tumblr",
+  "description": "Read your Tumblr dashboard, like, reblog and post from Flare",
+  "permissions": {
+    "httpOrigins": ["https://api.tumblr.com"],
+    "mediaNetwork": true
+  },
+  "platform": {
+    "id": "Tumblr",
+    "name": "Tumblr",
+    "description": "Tumblr through its official API v2, using your own Tumblr app",
+    "loginMethods": [
+      {
+        "id": "token",
+        "interaction": "CredentialImport",
+        "title": "Import Tumblr app tokens",
+        "description": "Register an app at tumblr.com/oauth/apps, run get_refresh_token.py from this plugin's repository once, then paste the three values here.",
+        "fields": [
+          { "id": "consumerKey", "type": "Text", "label": "OAuth consumer key" },
+          { "id": "consumerSecret", "type": "Secret", "label": "OAuth consumer secret" },
+          { "id": "refreshToken", "type": "Secret", "label": "Refresh token" }
+        ]
+      }
+    ],
+    "capabilities": {
+      "flare.datasource.timeline/v1": {
+        "operations": { "page": { "directions": ["refresh", "older"] } }
+      },
+      "flare.datasource.profile/v1": {
+        "operations": {
+          "byId": {},
+          "byHandle": {},
+          "timeline": { "directions": ["refresh", "older"] }
+        }
+      },
+      "flare.datasource.post/v1": {
+        "operations": {
+          "detail": {},
+          "context": { "directions": ["refresh"] },
+          "delete": {},
+          "mutate": {}
+        }
+      },
+      "flare.datasource.relation/v1": {
+        "operations": { "state": {}, "mutate": {} },
+        "relationActions": ["follow"]
+      },
+      "flare.datasource.notification/v1": {
+        "operations": { "page": { "directions": ["refresh", "older"] } },
+        "notificationFilters": ["all", "mention", "comment", "like"]
+      },
+      "flare.datasource.compose/v1": {
+        "operations": { "publish": {} }
+      }
+    },
+    "timelines": [
+      { "id": "dashboard", "title": "Dashboard", "icon": "Home", "defaultForNewAccount": true },
+      { "id": "likes", "title": "Likes", "icon": "Heart" }
+    ],
+    "profileTabs": [
+      { "id": "posts", "title": "Posts", "icon": "Profile" }
+    ],
+    "composeDefaults": {
+      "text": { "maxLength": 100000 },
+      "media": {
+        "maxCount": 10,
+        "maxBytes": 20971520,
+        "supportedMimeTypes": ["image/jpeg", "image/png", "image/gif", "image/webp", "video/mp4"],
+        "altTextMaxLength": 4096,
+        "canSensitive": false
+      },
+      "visibility": { "allowed": ["public"], "default": "public" }
+    },
+    "credentialSchemaVersion": 1,
+    "timelineSchemaVersion": 1
+  }
+}
