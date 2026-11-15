@@ -19,6 +19,13 @@ Tumblr API v2 with your own Tumblr app.
 Tumblr doesn't say when each reblog-trail entry was written, so trail entries show the
 reblog's time.
 
+## Finding Tumblr when adding an account
+
+Tumblr won't appear in the suggested server boxes on Flare's add-account screen, and
+typing part of the name (like `tum`) won't find it. Flare only shows its
+built-in platforms there; plugins can't add suggestions. Type the full address
+**`api.tumblr.com`** in the server box and Tumblr will appear.
+
 ## Sign in
 
 Flare's in-app OAuth uses a different callback address for every sign-in, and Tumblr
