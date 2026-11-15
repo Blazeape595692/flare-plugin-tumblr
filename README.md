@@ -28,8 +28,8 @@ only accepts pre-registered callbacks, so you authorize your own app once:
    is fine. Set the **OAuth2 redirect URLs** field to `http://localhost:8765/callback`.
 2. Run `python3 tools/get_refresh_token.py`, enter the app's OAuth consumer key and
    secret, and approve the app in the browser window that opens.
-3. In Flare, add an account, choose **Tumblr**, enter `https://www.tumblr.com` as the
-   server, pick **Import Tumblr app tokens**, and paste the consumer key, consumer
+3. In Flare, add an account and type `api.tumblr.com` as the server (the full address;
+   Flare doesn't suggest plugin platforms from partial text). Tumblr appears; pick **Import Tumblr app tokens**, and paste the consumer key, consumer
    secret and refresh token.
 
 Access tokens last about 40 minutes; the plugin renews them automatically and saves

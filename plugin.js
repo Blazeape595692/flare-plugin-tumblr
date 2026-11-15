@@ -29,12 +29,13 @@ var NOTIFICATION_TYPES = {
 
 defineFlareSocialPlugin({
   // Flare only offers a plugin on its add-account screen when the detector
-  // recognizes the address typed there, so claim tumblr.com without any request.
+  // recognizes the address typed there. The account address must be the API host,
+  // because Flare 1.8.0 only lets an account call the address it was added with.
   detector: {
     async detect(request, context) {
       var origin = String(request.origin || context.origin);
       var host = origin.replace(/^https:\/\//i, "").replace(/\/+$/, "").toLowerCase();
-      if (host !== "tumblr.com" && host !== "www.tumblr.com") return { match: "none", canonicalOrigin: origin };
+      if (host !== "api.tumblr.com") return { match: "none", canonicalOrigin: origin };
       return { match: "exact", canonicalOrigin: origin, software: "Tumblr", instance: { domain: host, title: "Tumblr" } };
     },
   },
@@ -247,9 +248,7 @@ defineFlareSocialPlugin({
 // ------------------------------------------------------------- credential
 
 function requireTumblrOrigin(origin) {
-  if (origin !== "https://www.tumblr.com" && origin !== "https://tumblr.com") {
-    validationError("Use https://www.tumblr.com as the server address");
-  }
+  if (origin !== API) validationError("Use api.tumblr.com as the server address");
   return origin;
 }
 
