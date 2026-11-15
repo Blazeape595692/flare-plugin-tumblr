@@ -10,6 +10,10 @@
 // Tumblr dashboard. Tumblr does not report when each trail entry was written, so
 // those entries carry the reblog's timestamp.
 
+// Each request gets its own limit, shorter than Flare's 30 seconds for a whole call, so a
+// slow server fails that request (a normal error) instead of the call (a plugin crash).
+var REQUEST_TIMEOUT_MS = 12000;
+
 var API = "https://api.tumblr.com";
 
 var TUMBLR_CAPABILITIES = {
@@ -27,7 +31,7 @@ var NOTIFICATION_TYPES = {
   like: ["like"],
 };
 
-defineFlareSocialPlugin({
+defineFlareSocialPlugin(guardPlugin("Tumblr", {
   // Flare only offers a plugin on its add-account screen when the detector
   // recognizes the address typed there. The account address must be the API host,
   // because Flare 1.8.0 only lets an account call the address it was added with.
@@ -243,7 +247,36 @@ defineFlareSocialPlugin({
       },
     },
   },
-});
+}));
+
+// Flare treats any error that isn't made with flare.error() as a plugin crash, and pauses
+// the plugin after three in a minute. Every entry point therefore turns a stray error
+// (a failed request, unexpected data) into an ordinary error Flare shows as a message.
+function guardPlugin(name, definition) {
+  function wrap(value) {
+    if (typeof value === "function") {
+      return async function () {
+        try {
+          return await value.apply(this, arguments);
+        } catch (error) {
+          if (error && error.__flarePluginErrorV1 !== undefined) throw error;
+          var network = !!(error && typeof error.code === "string" && /^host\./.test(error.code));
+          throw flare.error({
+            code: network ? "Network" : "InvalidResponse",
+            message: { value: network ? "Could not reach " + name : name + " sent something this plugin couldn't read" },
+          });
+        }
+      };
+    }
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      var out = {};
+      Object.keys(value).forEach(function (key) { out[key] = wrap(value[key]); });
+      return out;
+    }
+    return value;
+  }
+  return wrap(definition);
+}
 
 // ------------------------------------------------------------- credential
 
@@ -348,9 +381,10 @@ async function rawApi(token, method, path, options, allowRetry) {
 
 async function send(request) {
   try {
+    if (!request.timeoutMillis) request.timeoutMillis = REQUEST_TIMEOUT_MS;
     return await flare.http.request(request);
   } catch (error) {
-    if (error && typeof error === "object" && error.code === "host.unavailable") {
+    if (!(error && error.__flarePluginErrorV1 !== undefined)) {
       fail("Network", "Could not reach Tumblr");
     }
     throw error;
