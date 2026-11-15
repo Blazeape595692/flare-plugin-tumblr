@@ -44,9 +44,9 @@ defineFlareSocialPlugin({
     token: {
       async begin(request, context) {
         var origin = requireTumblrOrigin(context.origin);
-        var v = request.values || {};
+        var v = setupValues(request.values || {});
         var cred = {
-          clientId: need(v.consumerKey, "Enter your app's OAuth consumer key"),
+          clientId: need(v.consumerKey, "Enter your setup code, or your app's OAuth consumer key"),
           clientSecret: need(v.consumerSecret, "Enter your app's OAuth consumer secret"),
           refreshToken: need(v.refreshToken, "Enter a refresh token"),
         };
@@ -883,6 +883,29 @@ function validationError(message) { fail("Validation", message); }
 function invalidResponse(message) { fail("InvalidResponse", message); }
 function unsupported(message) { fail("Unsupported", message); }
 function notFound(message) { fail("NotFound", message); }
+
+/**
+ * get_refresh_token.py also shows everything as one setup code (a QR code to scan on a
+ * phone): "flare-tumblr:<key>:<secret>:<refresh token>", each part percent-encoded.
+ * A setup code fills in the three separate fields.
+ */
+function setupValues(values) {
+  var code = String(values.setupCode == null ? "" : values.setupCode).trim();
+  if (!code) return values;
+  var parts = code.split(":");
+  if (parts.length !== 4 || parts[0] !== "flare-tumblr") {
+    validationError("That setup code isn't valid. Scan or copy it again from get_refresh_token.py.");
+  }
+  var out = {};
+  try {
+    out.consumerKey = decodeURIComponent(parts[1]);
+    out.consumerSecret = decodeURIComponent(parts[2]);
+    out.refreshToken = decodeURIComponent(parts[3]);
+  } catch (e) {
+    validationError("That setup code isn't valid. Scan or copy it again from get_refresh_token.py.");
+  }
+  return out;
+}
 
 function need(value, message) {
   var text = String(value == null ? "" : value).trim();

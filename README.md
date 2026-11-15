@@ -34,10 +34,26 @@ only accepts pre-registered callbacks, so you authorize your own app once:
 1. Register an app at <https://www.tumblr.com/oauth/apps>. Any website and description
    is fine. Set the **OAuth2 redirect URLs** field to `http://localhost:8765/callback`.
 2. Run `python3 tools/get_refresh_token.py`, enter the app's OAuth consumer key and
-   secret, and approve the app in the browser window that opens.
-3. In Flare, add an account and type `api.tumblr.com` as the server (the full address;
-   Flare doesn't suggest plugin platforms from partial text). Tumblr appears; pick **Import Tumblr app tokens**, and paste the consumer key, consumer
-   secret and refresh token.
+   secret (the secret stays hidden as you paste it), and approve the app in the browser
+   window that opens.
+3. A page opens on your computer with a **setup code** and its QR code. The setup code
+   holds all three values Flare needs.
+   - **On your phone:** scan the QR code with the camera or Google Lens and copy the
+     text. If your camera only offers a web search, use a QR scanner app instead.
+   - **On this computer:** copy the code from the box under the QR code.
+4. In Flare, add an account and type `api.tumblr.com` as the server (the full address;
+   Flare doesn't suggest plugin platforms from partial text). Tumblr appears; pick
+   **Import Tumblr app tokens**, paste the code into **Setup code** and leave the other
+   three fields empty. (You can still fill in the consumer key, consumer secret and
+   refresh token separately instead.)
+5. Press Enter in the terminal to take the page down.
+
+The setup code and QR code contain your app secret and refresh token, so treat them like
+a password: don't share, post or screenshot them. The QR code is made on your computer,
+and the page is only reachable from your computer.
+
+If the helper says **invalid_client**, Tumblr rejected the secret: copy it again from the
+same app as the key (it's hidden until you click to show it) and run the helper again.
 
 Access tokens last about 40 minutes; the plugin renews them automatically and saves
 the new refresh token Tumblr issues each time.
