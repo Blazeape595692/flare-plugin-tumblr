@@ -112,6 +112,7 @@ def main():
     webbrowser.open(url)
     done.wait(timeout=600)
     server.shutdown()
+    server.server_close()  # free port 8765 right away
 
     if result.get("state") != state:
         sys.exit("Authorization failed: the state did not match (or timed out).")
@@ -196,10 +197,17 @@ def show_setup_code(cfg, client_id, client_secret, refresh):
         def log_message(self, *args):
             pass
 
-    server = http.server.HTTPServer(("127.0.0.1", 8765), Handler)
-    threading.Thread(target=server.serve_forever, daemon=True).start()
-    url = f"http://localhost:8765{page_path}"
     print("Success.\n")
+    try:
+        # Any free port: the sign-in listener's port may still be in use.
+        server = http.server.HTTPServer(("127.0.0.1", 0), Handler)
+    except OSError as error:
+        print(f"Couldn't start the QR code page ({error}). Paste this setup code into Flare instead:\n")
+        print("  " + code + "\n")
+        print("The setup code holds your app secret and refresh token: don't share or post it.")
+        return
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    url = f"http://127.0.0.1:{server.server_address[1]}{page_path}"
     print("Opening a page with your setup code as a QR code. If it doesn't open, visit:\n" + url + "\n")
     print("On your phone: scan the QR code with the camera (or Google Lens), copy the text,")
     print("then in Flare add an account with api.tumblr.com as the server, choose")
@@ -211,6 +219,7 @@ def show_setup_code(cfg, client_id, client_secret, refresh):
     except (EOFError, KeyboardInterrupt):
         print()
     server.shutdown()
+    server.server_close()
     print("Closed. Reload the page and it's gone.")
 
 
