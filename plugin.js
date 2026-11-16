@@ -1120,10 +1120,26 @@ function withOpenLinks(label, definition, urlFor) {
       var result = await thread.call(this, request, context);
       if (result && Array.isArray(result.items)) {
         var done = false;
+        var handles = {};
+        result.items.forEach(function (item) {
+          if (item && item.post && item.post.key && item.post.author) handles[item.post.key.id] = item.post.author.handle;
+        });
         result = Object.assign({}, result, { items: result.items.map(function (item) {
-          if (done || !item || item.type !== "post" || !item.post || !item.post.key ||
-            item.post.key.id !== request.key.id || (item.presentation && item.presentation.repost)) return item;
+          if (!item || item.type !== "post" || !item.post || !item.post.key) return item;
+          if (done) {
+            // Flare redraws a reply's parent above it when both are in the list, which
+            // repeats the opened post (or a busy comment) over every reply. Replies below
+            // the opened post are listed plainly, labelled with who they answer.
+            if (!item.post.replyTo) return item;
+            var flat = Object.assign({}, item.post);
+            var to = handles[flat.replyTo.id];
+            delete flat.replyTo;
+            if (to && !flat.replyToHandle) flat.replyToHandle = to;
+            return Object.assign({}, item, { post: flat });
+          }
+          if (item.post.key.id !== request.key.id) return item;
           done = true;
+          if (item.presentation && item.presentation.repost) return item;
           return Object.assign({}, item, { post: addLink(item.post, context) });
         }) });
       }
