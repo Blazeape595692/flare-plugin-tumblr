@@ -257,7 +257,7 @@ function guardPlugin(name, definition) {
     if (typeof value === "function") {
       return async function () {
         try {
-          return await value.apply(this, arguments);
+          return safeRichText(await value.apply(this, arguments));
         } catch (error) {
           if (error && error.__flarePluginErrorV1 !== undefined) throw error;
           var network = !!(error && typeof error.code === "string" && /^host\./.test(error.code));
@@ -276,6 +276,46 @@ function guardPlugin(name, definition) {
     return value;
   }
   return wrap(definition);
+}
+
+// Flare rejects a whole result if any link or image in rich text isn't plain HTTPS
+// (tumblr posts and bios often link to http:// sites or mailto: addresses). Before
+// returning, upgrade http:// links to https://, and drop any link target or image
+// Flare would still refuse, keeping the link's text.
+function safeRichText(value) {
+  if (Array.isArray(value)) return value.map(safeRichText);
+  if (!value || typeof value !== "object") return value;
+  var out = {};
+  Object.keys(value).forEach(function (key) { out[key] = safeRichText(value[key]); });
+  if (out.format === "html" && typeof out.value === "string") out.value = safeHtmlUrls(out.value);
+  return out;
+}
+
+var RICH_URL_ATTR = { a: "href", img: "src", emoji: "target" };
+
+function safeHtmlUrls(html) {
+  return html.replace(/<(a|img|emoji)\b([^>]*)>/gi, function (tag, name, attrs) {
+    var attrName = RICH_URL_ATTR[name.toLowerCase()];
+    var re = new RegExp("(\\s" + attrName + "\\s*=\\s*)(\"[^\"]*\"|'[^']*'|[^\\s\"'>]+)", "i");
+    var m = re.exec(attrs);
+    if (!m) return tag;
+    var raw = m[2].replace(/^["']|["']$/g, "");
+    var url = safeRichUrl(raw);
+    if (url) return "<" + name + attrs.slice(0, m.index) + m[1] + '"' + url.replace(/"/g, "&quot;") + '"' + attrs.slice(m.index + m[0].length) + ">";
+    if (name.toLowerCase() === "img") return "";
+    return "<" + name + attrs.slice(0, m.index) + attrs.slice(m.index + m[0].length) + ">";
+  });
+}
+
+function safeRichUrl(raw) {
+  var url = String(raw)
+    .replace(/&amp;/gi, "&").replace(/&#0*58;|&#x0*3a;|&colon;/gi, ":").replace(/&#0*47;|&#x0*2f;|&sol;/gi, "/")
+    .trim();
+  if (/^http:\/\//i.test(url)) url = "https://" + url.slice(7);
+  var m = /^https:\/\/([^\/?#\s]+)([\/?#][^\s"<>]*)?$/i.exec(url);
+  if (!m || url.length > 8000) return null;
+  if (!/^[A-Za-z0-9.-]+(?::\d{1,5})?$/.test(m[1]) || !/[A-Za-z0-9]/.test(m[1])) return null;
+  return url.replace(/&/g, "&amp;");
 }
 
 // ------------------------------------------------------------- credential

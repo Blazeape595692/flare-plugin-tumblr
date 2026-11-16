@@ -3,7 +3,7 @@
   "schemaVersion": 1,
   "apiVersion": 1,
   "id": "dev.flareplugins.tumblr",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "name": "Tumblr",
   "description": "Read your Tumblr dashboard, like, reblog and post from Flare",
   "permissions": {
