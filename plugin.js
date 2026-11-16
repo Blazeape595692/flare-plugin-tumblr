@@ -31,7 +31,7 @@ var NOTIFICATION_TYPES = {
   like: ["like"],
 };
 
-defineFlareSocialPlugin(guardPlugin("Tumblr", {
+defineFlareSocialPlugin(guardPlugin("Tumblr", withOpenLinks("Tumblr", {
   // Flare only offers a plugin on its add-account screen when the detector
   // recognizes the address typed there. The account address must be the API host,
   // because Flare 1.8.0 only lets an account call the address it was added with.
@@ -273,7 +273,7 @@ defineFlareSocialPlugin(guardPlugin("Tumblr", {
       },
     },
   },
-}));
+})));
 
 // Flare treats any error that isn't made with flare.error() as a plugin crash, and pauses
 // the plugin after three in a minute. Every entry point therefore turns a stray error
@@ -1089,4 +1089,46 @@ function clamp(value, min, max) {
   var n = Number(value);
   if (!Number.isFinite(n)) n = min;
   return Math.min(max, Math.max(min, Math.floor(n)));
+}
+
+// Adds an "Open in <site>" link to the end of a post when it's opened on its own
+// (detail and thread views), since plugins can't add items to Flare's post menu.
+function withOpenLinks(label, definition, urlFor) {
+  var post = definition.capabilities && definition.capabilities.post;
+  if (!post) return definition;
+  function addLink(p, context) {
+    if (!p || !p.content || p.content.format !== "html") return p;
+    var url = urlFor ? urlFor(p, context) : p.url;
+    if (!url || !/^https:\/\//i.test(url)) return p;
+    var link = '<p><a href="' + String(url).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;") +
+      '">Open in ' + label + " \u2197</a></p>";
+    return Object.assign({}, p, { content: { format: "html", value: p.content.value + link } });
+  }
+  var detail = post.detail;
+  if (detail) {
+    post.detail = async function (request, context) {
+      var result = await detail.call(this, request, context);
+      if (result && result.post && (!result.presentation || !result.presentation.repost)) {
+        result = Object.assign({}, result, { post: addLink(result.post, context) });
+      }
+      return result;
+    };
+  }
+  var thread = post.context;
+  if (thread) {
+    post.context = async function (request, context) {
+      var result = await thread.call(this, request, context);
+      if (result && Array.isArray(result.items)) {
+        var done = false;
+        result = Object.assign({}, result, { items: result.items.map(function (item) {
+          if (done || !item || item.type !== "post" || !item.post || !item.post.key ||
+            item.post.key.id !== request.key.id || (item.presentation && item.presentation.repost)) return item;
+          done = true;
+          return Object.assign({}, item, { post: addLink(item.post, context) });
+        }) });
+      }
+      return result;
+    };
+  }
+  return definition;
 }
