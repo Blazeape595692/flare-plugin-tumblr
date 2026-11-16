@@ -62,7 +62,14 @@ defineFlareSocialPlugin(guardPlugin("Tumblr", {
         var info = await rawApi(cred.accessToken, "GET", "/v2/user/info", {}, false);
         var user = obj(info && info.user, "user");
         var blogs = asArray(user.blogs).filter(function (b) { return b && b.name; });
-        var primary = blogs.filter(function (b) { return b.primary === true; })[0] || blogs[0];
+        var wanted = String(v.blog == null ? "" : v.blog).trim().replace(/^@/, "").replace(/\.tumblr\.com$/i, "").toLowerCase();
+        var primary = wanted
+          ? blogs.filter(function (b) { return String(b.name).toLowerCase() === wanted; })[0]
+          : blogs.filter(function (b) { return b.primary === true; })[0] || blogs[0];
+        if (!primary && wanted) {
+          validationError("This Tumblr account has no blog called " + wanted + ". Your blogs: " +
+            blogs.map(function (b) { return b.name; }).join(", "));
+        }
         if (!primary) validationError("This Tumblr account has no blog");
         cred.primaryBlog = String(primary.name);
         cred.blogs = blogs.map(function (b) { return String(b.name); }).slice(0, 50);
@@ -145,20 +152,31 @@ defineFlareSocialPlugin(guardPlugin("Tumblr", {
         var env = await environment(context);
         var ref = splitKey(request.key.id);
         var token = parseActionToken(request.actionToken);
-        if (!token) {
+        if (!token || !token.reblogKey) {
           var raw = await fetchRawPost(env, request.key.id);
-          token = { reblogKey: String(raw.reblog_key || ""), uuid: String((raw.blog && raw.blog.uuid) || "") };
+          token = Object.assign({}, token || {}, { reblogKey: String(raw.reblog_key || ""), uuid: blogUuid(raw) });
         }
+        var reblogged = null;
         if (request.action === "Favourite" || request.action === "Unfavourite") {
           await api(env, "POST", request.action === "Favourite" ? "/v2/user/like" : "/v2/user/unlike", {
             form: { id: ref.id, reblog_key: need(token.reblogKey, "This post can't be liked") },
           });
         } else if (request.action === "Repost") {
-          await createPost(env, [], [], {
-            parent_tumblelog_uuid: need(token.uuid, "This post can't be reblogged"),
+          // Some posts don't include the blog's uuid; look it up rather than refusing.
+          var uuid = token.uuid || (await blogUuidByName(env, ref.blog));
+          var created = await createPost(env, [], [], {
+            parent_tumblelog_uuid: need(uuid, "This post can't be reblogged"),
             parent_post_id: ref.id,
             reblog_key: need(token.reblogKey, "This post can't be reblogged"),
           });
+          var newId = String((created && (created.id_string || created.id)) || "");
+          // Tumblr doesn't report "you reblogged this", so show it until the next refresh,
+          // keeping the new reblog's id so pressing the button again can undo it.
+          reblogged = { id: newId ? env.cred.primaryBlog + "/" + newId : "" };
+        } else if (request.action === "Unrepost") {
+          var mine = token.reblog ? splitKey(token.reblog) : null;
+          if (!mine || !env.ownBlogs[mine.blog]) validationError("Delete the reblog from your blog to undo it");
+          await api(env, "POST", "/v2/blog/" + encodeURIComponent(mine.blog) + "/post/delete", { form: { id: mine.id } });
         } else if (request.action === "Delete") {
           if (!env.ownBlogs[ref.blog]) validationError("You can only delete posts on your own blogs");
           await api(env, "POST", "/v2/blog/" + encodeURIComponent(ref.blog) + "/post/delete", { form: { id: ref.id } });
@@ -166,7 +184,15 @@ defineFlareSocialPlugin(guardPlugin("Tumblr", {
         } else {
           unsupported("Tumblr does not support this action");
         }
-        var updated = mapPostItem(await fetchRawPost(env, request.key.id), env);
+        var fresh = await fetchRawPost(env, request.key.id);
+        if (request.action === "Repost" || request.action === "Unrepost") {
+          // Tumblr's count lags behind; adjust it so the button doesn't look like it failed.
+          var before = count(token.count) || 0;
+          var now = count(fresh.reblog_count) || 0;
+          if (request.action === "Repost" && now <= before) fresh = Object.assign({}, fresh, { reblog_count: before + 1 });
+          if (request.action === "Unrepost" && now >= before && before > 0) fresh = Object.assign({}, fresh, { reblog_count: before - 1 });
+        }
+        var updated = mapPostItem(fresh, env, reblogged);
         return { type: "updatedPost", post: updated.post };
       },
     },
@@ -579,7 +605,7 @@ function safeMapPostItem(raw, env) {
   return mapPostItem(raw, env);
 }
 
-function mapPostItem(raw, env) {
+function mapPostItem(raw, env, reblogged) {
   var id = String(raw.id_string || raw.id || "");
   var blog = raw.blog && typeof raw.blog === "object" ? raw.blog : { name: raw.blog_name };
   if (!id || !blog.name) invalidResponse("Tumblr returned an invalid post");
@@ -598,7 +624,7 @@ function mapPostItem(raw, env) {
     content: { format: "html", value: ownHtml + tagsHtml(raw.tags) },
     media: ownMedia.slice(0, 100),
     visibility: raw.state === "private" ? "followers" : "public",
-    actions: postActions(raw, env),
+    actions: postActions(raw, env, reblogged),
   };
   var url = httpsUrl(raw.post_url);
   if (url) post.url = url;
@@ -650,13 +676,18 @@ function mapTrailEntry(entry, index, parentKey, createdAt, env) {
   return { post: post };
 }
 
-function postActions(raw, env) {
+function postActions(raw, env, reblogged) {
   var token = actionToken(raw);
   var liked = raw.liked === true;
   var canReblog = raw.can_reblog !== false && !!token;
+  var repost = { action: "Repost", enabled: canReblog, actionToken: token || undefined };
+  if (reblogged) {
+    var undo = reblogged.id ? actionToken(raw, reblogged.id) : null;
+    repost = { action: "Unrepost", active: true, enabled: !!undo, actionToken: undo || undefined };
+  }
   var actions = [
     { action: "Reply", enabled: canReblog },
-    { action: "Repost", enabled: canReblog, actionToken: token || undefined },
+    repost,
     { action: liked ? "Unfavourite" : "Favourite", active: liked, enabled: raw.can_like !== false && !!token, actionToken: token || undefined },
   ];
   var blogName_ = (raw.blog && raw.blog.name) || raw.blog_name;
@@ -664,16 +695,32 @@ function postActions(raw, env) {
   return actions.map(stripUndefined);
 }
 
-function actionToken(raw) {
+function actionToken(raw, reblogId) {
   if (!raw.reblog_key) return null;
-  return JSON.stringify({ k: String(raw.reblog_key), u: String((raw.blog && raw.blog.uuid) || "") });
+  var token = { k: String(raw.reblog_key), u: blogUuid(raw), c: count(raw.reblog_count) || 0 };
+  if (reblogId) token.r = reblogId;
+  return JSON.stringify(token);
 }
 
 function parseActionToken(value) {
   if (!value) return null;
   var parsed = parseJson(value, true);
-  if (!parsed || !parsed.k || !parsed.u) return null;
-  return { reblogKey: String(parsed.k), uuid: String(parsed.u) };
+  if (!parsed || typeof parsed !== "object" || !parsed.k) return null;
+  return {
+    reblogKey: String(parsed.k),
+    uuid: parsed.u ? String(parsed.u) : "",
+    count: typeof parsed.c === "number" ? parsed.c : 0,
+    reblog: parsed.r ? String(parsed.r) : "",
+  };
+}
+
+function blogUuid(raw) {
+  return String((raw.blog && raw.blog.uuid) || raw.tumblelog_uuid || "");
+}
+
+async function blogUuidByName(env, name) {
+  var data = await api(env, "GET", "/v2/blog/" + encodeURIComponent(name) + "/info");
+  return String((data && data.blog && data.blog.uuid) || "");
 }
 
 function mapBlog(blog, origin) {
@@ -966,6 +1013,7 @@ function notFound(message) { fail("NotFound", message); }
 function setupValues(values) {
   var code = String(values.setupCode == null ? "" : values.setupCode).trim();
   if (!code) return values;
+  var blogChoice = values.blog;
   var parts = code.split(":");
   if (parts.length !== 4 || parts[0] !== "flare-tumblr") {
     validationError("That setup code isn't valid. Scan or copy it again from get_refresh_token.py.");
@@ -978,6 +1026,7 @@ function setupValues(values) {
   } catch (e) {
     validationError("That setup code isn't valid. Scan or copy it again from get_refresh_token.py.");
   }
+  out.blog = blogChoice;
   return out;
 }
 

@@ -3,7 +3,7 @@
   "schemaVersion": 1,
   "apiVersion": 1,
   "id": "dev.flareplugins.tumblr",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "name": "Tumblr",
   "description": "Read your Tumblr dashboard, like, reblog and post from Flare",
   "permissions": {
@@ -19,12 +19,13 @@
         "id": "token",
         "interaction": "CredentialImport",
         "title": "Import Tumblr app tokens",
-        "description": "Add the account with api.tumblr.com as the server. Register an app at tumblr.com/oauth/apps and run get_refresh_token.py from this plugin's repository once. Then paste the setup code it shows (or scan its QR code on your phone), or fill in the three values instead.",
+        "description": "Add the account with api.tumblr.com as the server. Register an app at tumblr.com/oauth/apps and run get_refresh_token.py from this plugin's repository once. Then paste the setup code it shows (or scan its QR code on your phone), or fill in the three values instead. To use another of your blogs, add the account again with that blog's name, using a new setup code for each blog.",
         "fields": [
           { "id": "setupCode", "type": "Secret", "label": "Setup code (or fill in the three fields below)", "required": false },
           { "id": "consumerKey", "type": "Text", "label": "OAuth consumer key", "required": false },
           { "id": "consumerSecret", "type": "Secret", "label": "OAuth consumer secret", "required": false },
-          { "id": "refreshToken", "type": "Secret", "label": "Refresh token", "required": false }
+          { "id": "refreshToken", "type": "Secret", "label": "Refresh token", "required": false },
+          { "id": "blog", "type": "Text", "label": "Blog (leave empty for your main blog)", "required": false }
         ]
       }
     ],

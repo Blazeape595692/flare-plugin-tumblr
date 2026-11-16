@@ -213,6 +213,9 @@ def show_setup_code(cfg, client_id, client_secret, refresh):
     print("then in Flare add an account with api.tumblr.com as the server, choose")
     print(cfg["name"] + " and paste it into \"Setup code\". On this computer, copy it from the page.\n")
     print("The setup code holds your app secret and refresh token: don't share or post it.")
+    if cfg["name"] == "Tumblr":
+        print("\nFor another of your blogs, run this again for a new setup code and type that")
+        print("blog's name into \"Blog\" in Flare. Each blog needs its own setup code.\n")
     webbrowser.open(url)
     try:
         input("Press Enter here when you're done to close the page... ")

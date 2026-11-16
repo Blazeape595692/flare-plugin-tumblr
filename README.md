@@ -10,11 +10,12 @@ Tumblr API v2 with your own Tumblr app.
 | Timelines | Dashboard (default), Likes |
 | Posts | Full Neue Post Format rendering: formatting, headings, lists, quotes, images with alt text, GIFs, video, audio, links, polls (read-only), asks, tags |
 | Reblog trails | Shown as a thread above the post, like the Tumblr dashboard. Plain reblogs show "*blog* reblogged" over the original. |
-| Actions | Like/unlike, reblog, delete posts on your own blogs |
+| Actions | Like/unlike, reblog (press again to undo), delete posts on your own blogs |
 | Replies | The thread view shows replies and reblogs-with-comment from the post's notes. Replying from Flare reblogs the post with your comment, since Tumblr has no public reply API. |
 | Profiles | Blog pages with posts, follow/unfollow |
 | Notifications | Likes, replies, reblogs, follows, mentions, asks; All / Mentions / Comments / Likes filters |
-| Compose | Text (blank lines start new paragraphs), images with alt text, video. A last line of only `#tags` becomes the post's tags. Posts go to your primary blog. |
+| Compose | Text (blank lines start new paragraphs), images with alt text, video. A last line of only `#tags` becomes the post's tags. Posts and reblogs go to the account's blog. |
+| Several blogs | Add each blog as its own account (see below); each then has its own entry in Flare's account list. |
 
 Tumblr doesn't say when each reblog-trail entry was written, so trail entries show the
 reblog's time.
@@ -47,6 +48,17 @@ only accepts pre-registered callbacks, so you authorize your own app once:
    three fields empty. (You can still fill in the consumer key, consumer secret and
    refresh token separately instead.)
 5. Press Enter in the terminal to take the page down.
+
+### Your other blogs
+
+The account uses your main blog. To use another of your blogs, add it as a separate
+account: run the helper again for a **new** setup code, add an account in Flare, paste
+the new code and type the blog's name into **Blog**. Each blog then appears in Flare's
+account list, and posts, reblogs and notifications use that blog. The dashboard is the
+same for all of them.
+
+Use a fresh setup code for each blog. Tumblr replaces the refresh token every time it's
+used, so two accounts sharing one code would sign each other out.
 
 The setup code and QR code contain your app secret and refresh token, so treat them like
 a password: don't share, post or screenshot them. The QR code is made on your computer,
