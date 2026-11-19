@@ -3,7 +3,7 @@
   "schemaVersion": 1,
   "apiVersion": 1,
   "id": "dev.flareplugins.tumblr",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "name": "Tumblr",
   "description": "Read your Tumblr dashboard, like, reblog and post from Flare",
   "permissions": {
@@ -46,6 +46,15 @@
           "context": { "directions": ["refresh"] },
           "delete": {},
           "mutate": {}
+        }
+      },
+      "flare.datasource.search/v1": {
+        "operations": {
+          "posts": { "directions": ["refresh", "older"] },
+          "profiles": { "directions": ["refresh"] },
+          "discoverPosts": { "directions": ["refresh"] },
+          "discoverProfiles": { "directions": ["refresh"] },
+          "discoverHashtags": { "directions": ["refresh"] }
         }
       },
       "flare.datasource.relation/v1": {

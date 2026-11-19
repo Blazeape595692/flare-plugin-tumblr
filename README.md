@@ -13,6 +13,7 @@ Tumblr API v2 with your own Tumblr app.
 | Actions | Like/unlike, reblog (press again to undo), delete posts on your own blogs |
 | Replies | The thread view shows replies and reblogs-with-comment from the post's notes. Replying from Flare reblogs the post with your comment, since Tumblr has no public reply API. |
 | Profiles | Blog pages with posts, follow/unfollow |
+| Search | Posts by tag (`art` or `#digital art` shows posts tagged that) and blogs by exact name; Tumblr's API has no text search |
 | Notifications | Likes, replies, reblogs, follows, mentions, asks; All / Mentions / Comments / Likes filters |
 | Compose | Text (blank lines start new paragraphs), images with alt text, video. A last line of only `#tags` becomes the post's tags. Posts and reblogs go to the account's blog. |
 | Several blogs | Add each blog as its own account (see below); each then has its own entry in Flare's account list. |

@@ -23,6 +23,7 @@ var TUMBLR_CAPABILITIES = {
   "flare.datasource.relation/v1": ["state", "mutate"],
   "flare.datasource.notification/v1": ["page"],
   "flare.datasource.compose/v1": ["publish"],
+  "flare.datasource.search/v1": ["posts", "profiles", "discoverPosts", "discoverProfiles", "discoverHashtags"],
 };
 
 var NOTIFICATION_TYPES = {
@@ -194,6 +195,46 @@ defineFlareSocialPlugin(guardPlugin("Tumblr", withOpenLinks("Tumblr", {
         }
         var updated = mapPostItem(fresh, env, reblogged);
         return { type: "updatedPost", post: updated.post };
+      },
+    },
+
+    // Tumblr's API has no text search: posts are searched by tag, and blogs by exact name.
+    search: {
+      async posts(request, context) {
+        var env = await environment(context);
+        var tag = String(request.query || "").trim().replace(/^#/, "");
+        if (!tag) return { items: [], endReached: true };
+        var query = { tag: tag, limit: "20", npf: "true" };
+        if (request.page.direction !== "refresh" && /^\d{1,12}$/.test(String(request.page.cursor || ""))) {
+          query.before = String(request.page.cursor);
+        }
+        var posts = asArray(await api(env, "GET", "/v2/tagged", { query: query }));
+        var items = posts.map(function (p) { return safeMapPostItem(p, env); }).filter(Boolean);
+        var last = posts[posts.length - 1];
+        var before = last ? Math.floor(Number(last.featured_timestamp || last.timestamp)) : NaN;
+        if (!posts.length || !Number.isFinite(before) || before <= 0) return { items: items, endReached: true };
+        return { items: items, olderCursor: String(before), endReached: false };
+      },
+      async profiles(request, context) {
+        var env = await environment(context);
+        var name = String(request.query || "").trim().replace(/^@/, "").replace(/\.tumblr\.com$/i, "");
+        if (!name || request.page.direction !== "refresh" || !/^[A-Za-z0-9-]{1,64}$/.test(name)) return { items: [], endReached: true };
+        try {
+          return { items: [await fetchBlog(env, name)], endReached: true };
+        } catch (e) {
+          var info = e && e.__flarePluginErrorV1;
+          if (info && info.code === "NotFound") return { items: [], endReached: true };
+          throw e;
+        }
+      },
+      async discoverPosts() {
+        return { items: [], endReached: true }; // Tumblr's explore page isn't in its API
+      },
+      async discoverProfiles() {
+        return { items: [], endReached: true };
+      },
+      async discoverHashtags() {
+        return { items: [], endReached: true };
       },
     },
 
@@ -615,6 +656,7 @@ function mapPostItem(raw, env, reblogged) {
 
   var ownMedia = [];
   var ownHtml = renderNpf(raw.content, raw.layout, key.id, ownMedia);
+  if (!ownHtml && !Array.isArray(raw.content)) ownHtml = legacyHtml(raw, key.id, ownMedia);
   var trail = asArray(raw.trail).filter(function (t) { return t && (t.content || t.blog || t.broken_blog_name); });
   var parents = trail.map(function (entry, i) { return mapTrailEntry(entry, i, key, createdAt, env); });
 
@@ -829,6 +871,20 @@ function mapNotification(n, env) {
 }
 
 // ------------------------------------------------------------ NPF -> HTML
+
+// Some endpoints can answer in Tumblr's older post format; show its text and photos.
+function legacyHtml(raw, idPrefix, media) {
+  asArray(raw.photos).forEach(function (photo, i) {
+    var url = photo && photo.original_size && httpsUrl(photo.original_size.url);
+    if (url && media.length < 100) media.push({ id: idPrefix + "-p" + i, type: /\.gif(\?|$)/i.test(url) ? "gif" : "image", url: url });
+  });
+  var parts = [];
+  if (raw.title) parts.push("<p><b>" + esc(String(raw.title)) + "</b></p>");
+  ["body", "caption", "text", "description", "answer"].forEach(function (f) {
+    if (typeof raw[f] === "string" && raw[f].trim()) parts.push(String(raw[f]));
+  });
+  return parts.join("");
+}
 
 function renderNpf(blocks, layout, idPrefix, media) {
   var list = asArray(blocks);
